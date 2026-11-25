@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>租房合同助手</title>
+<style>
+:root {
+  --bg: #f6f5f1;
+  --paper: #ffffff;
+  --ink: #1f2328;
+  --muted: #6a6f76;
+  --line: #e3dfd5;
+  --accent: #1d5fa8;
+  --accent-soft: #e9f0f9;
+  --warn: #a3560c;
+  --warn-soft: #fbf1e4;
+  --gap: #44505f;
+  --gap-soft: #ebeef2;
+  --bad: #b42318;
+  --bad-soft: #fcebe9;
+  --ok: #2f7a3b;
+  --quote: #f3f0e7;
+  --quote-line: #cfc6ad;
+  --sans: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "WenQuanYi Micro Hei", sans-serif;
+  /* 合同原文用衬线体，和程序写的话分开；没有宋体类字体的电脑（比如 Windows）退回到无衬线 */
+  --serif: "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", var(--sans);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #16181b; --paper: #1e2125; --ink: #e6e3dc; --muted: #9aa0a8; --line: #33373d;
+    --accent: #7fb0ea; --accent-soft: #1f2b3a; --warn: #e3a35a; --warn-soft: #2e2418;
+    --gap: #b8c0cb; --gap-soft: #2a2f36; --bad: #f08a80; --bad-soft: #3a1f1c; --ok: #7fc48a;
+    --quote: #23262b; --quote-line: #4d4a40;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #16181b; --paper: #1e2125; --ink: #e6e3dc; --muted: #9aa0a8; --line: #33373d;
+  --accent: #7fb0ea; --accent-soft: #1f2b3a; --warn: #e3a35a; --warn-soft: #2e2418;
+  --gap: #b8c0cb; --gap-soft: #2a2f36; --bad: #f08a80; --bad-soft: #3a1f1c; --ok: #7fc48a;
+  --quote: #23262b; --quote-line: #4d4a40;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.75 var(--sans); overflow-wrap: anywhere;
+}
+.wrap { max-width: 780px; margin: 0 auto; padding: 0 16px; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+.top { padding: 40px 0 8px; }
+.top h1 { margin: 0; font-size: 28px; letter-spacing: .02em; }
+.top p { margin: 6px 0 0; color: var(--muted); }
+
+.drop {
+  margin: 24px 0; padding: 44px 20px; text-align: center;
+  background: var(--paper); border: 2px dashed var(--line); border-radius: 14px;
+  transition: border-color .15s, background .15s;
+}
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop .big { font-size: 19px; margin: 0 0 6px; }
+.drop .hint { color: var(--muted); font-size: 14px; margin: 14px 0 0; }
+.btn {
+  display: inline-block; padding: 8px 20px; border-radius: 8px; border: 0;
+  background: var(--accent); color: #fff; font-weight: 600;
+}
+:root[data-theme="dark"] .btn { color: #10161d; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn { color: #10161d; } }
+.btn:disabled { opacity: .55; cursor: default; }
+.error { color: var(--bad); background: var(--bad-soft); padding: 8px 12px; border-radius: 8px; margin: 14px auto 0; max-width: 32em; }
+
+.file-line { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; margin: 24px 0 6px; }
+.file-line strong { font-size: 19px; }
+.file-line .muted { flex: 1; }
+.link { background: none; border: 0; padding: 0; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+
+.steps { list-style: none; margin: 10px 0 4px; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 15px; }
+.steps li { display: flex; align-items: center; gap: 7px; color: var(--muted); }
+.steps li::before {
+  content: ""; width: 16px; height: 16px; border-radius: 50%; flex: none;
+  border: 2px solid var(--line); box-sizing: border-box;
+}
+.steps li[data-state="running"] { color: var(--ink); }
+.steps li[data-state="running"]::before { border-color: var(--accent); border-right-color: transparent; animation: spin .8s linear infinite; }
+.steps li[data-state="done"] { color: var(--ink); }
+.steps li[data-state="done"]::before {
+  border: 0;
+  background: var(--ok) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.2l2.6 2.6L10 3.4' fill='none' stroke='white' stroke-width='2'/%3E%3C/svg%3E") center / 11px no-repeat;
+}
+.steps li[data-state="failed"] { color: var(--bad); }
+.steps li[data-state="failed"]::before { border-color: var(--bad); background: var(--bad-soft); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.status { color: var(--muted); font-size: 14px; margin: 4px 0 0; }
+.failed { margin: 12px 0; padding: 12px 14px; border-radius: 10px; background: var(--bad-soft); color: var(--bad); }
+.failed p { margin: 0 0 8px; }
+
+.card { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 4px 20px 16px; margin: 18px 0; }
+.card > h2 { font-size: 19px; margin: 16px 0 10px; display: flex; gap: 10px; align-items: baseline; }
+.card > h2 .count { font-size: 14px; font-weight: normal; color: var(--muted); }
+.card > .note { color: var(--muted); font-size: 14px; margin: -4px 0 10px; }
+.empty { color: var(--muted); }
+
+.risk { border-left: 4px solid var(--warn); padding: 4px 0 4px 16px; margin: 18px 0 22px; }
+.risk + .risk { border-top: 1px solid var(--line); padding-top: 18px; }
+.risk header { display: flex; gap: 10px; align-items: baseline; }
+.risk h3 { margin: 0; font-size: 17px; }
+.rid { font-size: 13px; color: var(--warn); background: var(--warn-soft); padding: 0 7px; border-radius: 5px; flex: none; }
+.risk p { margin: 8px 0; }
+.risk .how { font-weight: 600; }
+.label { color: var(--muted); font-weight: normal; }
+.basis { font-size: 14px; color: var(--muted); }
+
+.quote {
+  margin: 10px 0; padding: 8px 14px; background: var(--quote); border-left: 3px solid var(--quote-line);
+  border-radius: 0 8px 8px 0; font-family: var(--serif);
+}
+.quote p { margin: 0; }
+.src {
+  background: none; border: 0; padding: 0; font: 13px/1.6 var(--sans); color: var(--accent);
+  text-decoration: underline dotted; text-underline-offset: 3px;
+}
+.src[aria-expanded="true"] { text-decoration-style: solid; }
+.clause-full {
+  margin: -4px 0 12px; padding: 10px 14px; border: 1px dashed var(--quote-line); border-radius: 8px;
+  background: var(--paper); font-family: var(--serif); font-size: 15px;
+}
+.clause-full .head { font: 600 13px/1.6 var(--sans); color: var(--muted); margin-bottom: 4px; }
+.clause-full .text { white-space: pre-wrap; }
+
+.facts { margin: 0; }
+.facts .row { display: grid; grid-template-columns: 7em 1fr; gap: 4px 14px; padding: 9px 0; border-top: 1px solid var(--line); }
+.facts .row:first-child { border-top: 0; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; }
+.facts .quotes { margin-top: 4px; }
+.facts .link { font-size: 13px; margin-left: 8px; }
+.tag { display: inline-block; font-size: 14px; padding: 0 8px; border-radius: 6px; line-height: 1.8; }
+.tag.gap { color: var(--gap); background: var(--gap-soft); }
+.tag.lost { color: var(--muted); background: var(--gap-soft); }
+
+.missing { list-style: none; margin: 0; padding: 0; }
+.missing li { padding: 10px 0; border-top: 1px solid var(--line); }
+.missing li:first-child { border-top: 0; }
+.missing .what { font-weight: 600; }
+.missing .sub { display: block; font-size: 14px; color: var(--muted); }
+
+.ask-form { display: flex; gap: 8px; margin: 4px 0 8px; }
+.ask-form input {
+  flex: 1; min-width: 0; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg);
+}
+.question { margin: 14px 0 4px; font-weight: 600; }
+.answer { margin: 4px 0; }
+.cite { white-space: normal; }
+.cite q { font-family: var(--serif); background: var(--quote); padding: 0 4px; border-radius: 4px; quotes: "「" "」"; }
+.cite .src { margin-left: 4px; }
+.cite.unverified q { background: var(--bad-soft); text-decoration: line-through; text-decoration-color: var(--bad); }
+.cite.unverified .src { color: var(--bad); }
+.answer-note { font-size: 14px; color: var(--muted); margin: 6px 0 0; }
+.answer-note.bad { color: var(--bad); }
+
+details.more { margin: 18px 0; }
+details.more summary { cursor: pointer; color: var(--muted); }
+details.more ul { font-size: 14px; color: var(--muted); padding-left: 1.2em; }
+.contract { font-family: var(--serif); font-size: 15px; }
+.contract h4 { font: 600 14px/1.6 var(--sans); margin: 14px 0 2px; color: var(--muted); }
+.contract p { margin: 0; white-space: pre-wrap; }
+
+footer { color: var(--muted); font-size: 13px; padding: 24px 0 40px; border-top: 1px solid var(--line); margin-top: 32px; }
+
+@media (max-width: 560px) {
+  .top { padding-top: 28px; }
+  .top h1 { font-size: 24px; }
+  .card { padding: 2px 14px 12px; }
+  .facts .row { grid-template-columns: 1fr; gap: 0; }
+  .risk { padding-left: 12px; }
+}
+</style>
+</head>
+<body data-state="idle">
+<div class="wrap">
+  <header class="top">
+    <h1>租房合同助手</h1>
+    <p>上传租房合同 PDF 或 md / txt 文本：抽出关键信息，标出值得留意的条款，每条都附原文和出处，还可以接着问。</p>
+  </header>
+
+  <main>
+    <section id="upload" class="drop">
+      <p class="big"><strong>把合同 PDF 或 md / txt 拖到这里</strong></p>
+      <p>或者 <button type="button" class="btn" id="pick">选择文件</button></p>
+      <input type="file" id="file" accept="application/pdf,.pdf,.md,.mdx,.txt" hidden>
+      <p class="hint">合同只在这台电脑上处理和保存。扫描件、照片读不出文字，暂不支持。</p>
+      <p class="error" id="upload-error" hidden></p>
+    </section>
+
+    <section id="job" hidden>
+      <div class="file-line">
+        <strong id="filename"></strong>
+        <span class="muted" id="meta"></span>
+        <a class="link" href="/">换一份合同</a>
+      </div>
+      <ol class="steps" aria-label="进度">
+        <li data-step="split">切好条款</li>
+        <li data-step="info">抽取关键信息</li>
+        <li data-step="risks">对照风险清单</li>
+        <li data-step="done">找合同没写的事</li>
+      </ol>
+      <p class="status" id="status" aria-live="polite"></p>
+      <div class="failed" id="failed" hidden>
+        <p id="failed-text"></p>
+        <button type="button" class="btn" id="retry">重试</button>
+      </div>
+
+      <!-- 租客最想知道哪里有坑：风险和没写的事放最前面，关键信息表在后面备查 -->
+      <section class="card" id="risks-section" hidden>
+        <h2>值得留意的条款 <span class="count" id="risk-count"></span></h2>
+        <p class="note">对照人工审核过的风险清单找出来的。只说合同怎么写、为什么值得问清楚，不判断条款是否违法或无效。</p>
+        <div id="risks"></div>
+      </section>
+
+      <section class="card" id="missing-section" hidden>
+        <h2>合同里没写、建议问清楚的事</h2>
+        <ul class="missing" id="missing"></ul>
+      </section>
+
+      <section class="card" id="info-section" hidden>
+        <h2>关键信息</h2>
+        <dl class="facts" id="facts"></dl>
+      </section>
+
+      <section class="card" id="ask-section">
+        <h2>接着问</h2>
+        <form class="ask-form" id="ask-form">
+          <input id="question" maxlength="500" placeholder="比如：押金多久退？能养猫吗？" autocomplete="off" aria-label="你的问题">
+          <button class="btn" id="ask-btn">问</button>
+        </form>
+        <div id="answer"></div>
+      </section>
+
+      <details class="more" id="checks" hidden>
+        <summary id="checks-title">程序核对时去掉、改正的</summary>
+        <ul id="checks-list"></ul>
+      </details>
+      <details class="more">
+        <summary>合同全文（按条款切好的）</summary>
+        <div class="contract" id="contract"></div>
+      </details>
+    </section>
+  </main>
+
+  <footer>不是法律意见：只提醒哪里值得留意、建议问清楚，不判断条款是否违法或无效。依据仅供自己查证。</footer>
+</div>
+
+<script>
+"use strict";
+
+const $ = (sel) => document.querySelector(sel);
+
+// 造元素：文字一律当纯文本放进去，合同和模型写的内容不会被当成 HTML
+function h(tag, attrs = {}, ...children) {
+  const el = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    if (value == null || value === false) continue;
+    if (key === "class") el.className = value;
+    else if (key === "dataset") Object.assign(el.dataset, value);
+    else if (key.startsWith("on")) el.addEventListener(key.slice(2), value);
+    else el.setAttribute(key, value === true ? "" : value);
+  }
+  for (const child of children.flat(Infinity)) {
+    if (child != null && child !== false) el.append(child instanceof Node ? child : String(child));
+  }
+  return el;
+}
+
+const state = { job: null, clauses: {}, fields: [], timer: null, source: null, uploading: false, asking: false, checks: {} };
+
+// ---------- 条款和出处 ----------
+
+function clauseName(c) {
+  return c.heading || { preamble: "合同开头", sign: "签字栏" }[c.id] || c.id;
+}
+
+function where(id) {
+  const c = state.clauses[id];
+  return c ? `第 ${c.pages.join("、")} 页 · ${clauseName(c)}` : id;
+}
+
+// 出处：点一下在引文下面展开整条原文，再点收起
+function sourceButton(id, label) {
+  const btn = h("button", { type: "button", class: "src", "aria-expanded": "false" }, label || where(id));
+  btn.addEventListener("click", () => toggleClause(btn, id));
+  return btn;
+}
+
+function toggleClause(btn, id) {
+  const anchor = btn.closest("[data-anchor]");
+  const next = anchor.nextElementSibling;
+  const opened = next && next.classList.contains("clause-full") ? next : null;
+  if (opened) opened.remove();
+  anchor.querySelectorAll('.src[aria-expanded="true"]').forEach((b) => b.setAttribute("aria-expanded", "false"));
+  if (opened && opened.dataset.clause === id) return;
+  const c = state.clauses[id];
+  anchor.after(h("div", { class: "clause-full", dataset: { clause: id } },
+    h("div", { class: "head" }, where(id)),
+    h("div", { class: "text" }, c ? c.text : "合同里找不到这一条")));
+  btn.setAttribute("aria-expanded", "true");
+}
+
+function quoteBlock(q) {
+  return h("blockquote", { class: "quote", dataset: { anchor: "" } }, h("p", {}, q.text), sourceButton(q.clause));
+}
+
+// ---------- 上传 ----------
+
+function errorText(body, status) {
+  return typeof body.detail === "string" ? body.detail : `出错了（${status}）`;
+}
+
+function showUploadError(text) {
+  const el = $("#upload-error");
+  el.textContent = text;
+  el.hidden = !text;
+}
+
+async function upload(file) {
+  if (!file || state.uploading) return;
+  state.uploading = true;
+  showUploadError("");
+  $("#pick").disabled = true;
+  $("#pick").textContent = "正在读取…";
+  try {
+    const body = new FormData();
+    body.append("file", file);
+    const res = await fetch("/jobs", { method: "POST", body });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return showUploadError(errorText(data, res.status));
+    history.replaceState(null, "", `?job=${encodeURIComponent(data.id)}`);
+    openJob(data);
+  } catch {
+    showUploadError("连不上服务，确认它还在运行");
+  } finally {
+    state.uploading = false;
+    $("#pick").disabled = false;
+    $("#pick").textContent = "选择文件";
+    $("#file").value = "";
+  }
+}
+
+const drop = $("#upload");
+$("#pick").addEventListener("click", () => $("#file").click());
+$("#file").addEventListener("change", (e) => upload(e.target.files[0]));
+drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", (e) => {
+  e.preventDefault();
+  drop.classList.remove("over");
+  upload(e.dataTransfer.files[0]);
+});
+
+// ---------- 任务和进度 ----------
+
+function setStep(name, value) {
+  document.querySelector(`.steps [data-step="${name}"]`).dataset.state = value;
+}
+
+function setState(value) {
+  document.body.dataset.state = value;
+}
+
+function startTimer(since) {
+  clearInterval(state.timer);
+  const tick = () => {
+    const secs = Math.max(0, Math.round(Date.now() / 1000 - since));
+    $("#status").textContent = `正在处理，已用 ${secs} 秒。通常要 10～30 秒，人多时要排队；关掉页面也会接着做完，用这个网址回来看。`;
+  };
+  tick();
+  state.timer = setInterval(tick, 1000);
+}
+
+function openJob(job) {
+  state.job = job;
+  state.clauses = Object.fromEntries(job.clauses.map((c) => [c.id, c]));
+  state.checks = {};
+  $("#upload").hidden = true;
+  $("#job").hidden = false;
+  $("#filename").textContent = job.filename || "合同";
+  $("#meta").textContent = `${job.pages} 页 · ${job.clauses.filter((c) => c.number != null).length} 条`;
+  for (const id of ["#info-section", "#risks-section", "#missing-section", "#failed", "#checks"]) $(id).hidden = true;
+  setStep("split", "done");
+  for (const step of ["info", "risks", "done"]) setStep(step, "running");
+  setStep("done", "waiting");
+  $("#contract").replaceChildren(...job.clauses.map((c) => [h("h4", {}, where(c.id)), h("p", {}, c.text)]).flat());
+  if (job.status === "running") {
+    setState("running");
+    startTimer(job.created);
+  }
+  follow(job.id);
+}
+
+// 进度：服务端先补发已经做完的步骤，之后做完一步推一步；断了浏览器会自己重连
+function follow(id) {
+  if (state.source) state.source.close();
+  const source = new EventSource(`/jobs/${encodeURIComponent(id)}/events`);
+  state.source = source;
+  source.onmessage = (msg) => {
+    const ev = JSON.parse(msg.data);
+    if (ev.type === "info") showInfo(ev);
+    else if (ev.type === "risks") showRisks(ev);
+    else if (ev.type === "done") {
+      source.close();
+      showMissing(ev.missing || []);
+      finish("done");
+    } else if (ev.type === "failed") {
+      source.close();
+      showFailed(ev.error);
+    }
+  };
+}
+
+function finish(result) {
+  clearInterval(state.timer);
+  setStep("done", result === "done" ? "done" : "failed");
+  $("#status").textContent = result === "done" ? "看完了。点引文下面的出处，可以展开那一条的全文。" : "";
+  setState(result);
+}
+
+function showFailed(error) {
+  for (const step of ["info", "risks"]) {
+    if (document.querySelector(`.steps [data-step="${step}"]`).dataset.state !== "done") setStep(step, "failed");
+  }
+  $("#failed-text").textContent = `${error || "出错了"}。做完的步骤已经存下，重试只重做没做完的。`;
+  $("#failed").hidden = false;
+  finish("failed");
+}
+
+$("#retry").addEventListener("click", async () => {
+  const res = await fetch(`/jobs/${encodeURIComponent(state.job.id)}/retry`, { method: "POST" });
+  if (!res.ok) return;
+  $("#failed").hidden = true;
+  openJob(await res.json());
+});
+
+// ---------- 关键信息 ----------
+
+function describe(fact) {
+  if ("yuan" in fact) return `${fact.yuan.toLocaleString("zh-CN")} 元`;
+  if ("start" in fact) return `${fact.start} 至 ${fact.end}`;
+  return fact.value;
+}
+
+function quotesToggle(quotes) {
+  const box = h("div", { class: "quotes", hidden: true }, quotes.map(quoteBlock));
+  const btn = h("button", { type: "button", class: "link" }, "看原文");
+  btn.addEventListener("click", () => {
+    box.hidden = !box.hidden;
+    btn.textContent = box.hidden ? "看原文" : "收起原文";
+  });
+  return [btn, box];
+}
+
+function showInfo(ev) {
+  const failed = new Set(ev.dropped.map((d) => d.field));
+  $("#facts").replaceChildren(...state.fields.map(({ name, label }) => {
+    const fact = ev.info[name];
+    let value;
+    if (fact) value = [describe(fact), quotesToggle(fact.quotes)];
+    else if (failed.has(name) || failed.has("*")) value = h("span", { class: "tag lost" }, "没抽出来：模型给的原文和合同对不上，宁可不显示");
+    else value = h("span", { class: "tag gap" }, "合同里没写");
+    return h("div", { class: "row" }, h("dt", {}, label), h("dd", {}, value));
+  }));
+  $("#info-section").hidden = false;
+  setStep("info", "done");
+  state.checks.info = ev;
+  showChecks();
+}
+
+// ---------- 风险条款 ----------
+
+function showRisks(ev) {
+  $("#risk-count").textContent = ev.findings.length ? `${ev.findings.length} 条` : "";
+  $("#risks").replaceChildren(...(ev.findings.length ? ev.findings.map((f) =>
+    h("article", { class: "risk" },
+      h("header", {}, h("span", { class: "rid" }, f.risk.id), h("h3", {}, f.risk.title)),
+      h("p", { class: "how" }, h("span", { class: "label" }, "合同怎么写："), f.how),
+      f.quotes.map(quoteBlock),
+      h("p", {}, h("span", { class: "label" }, "为什么要留意："), f.risk.why),
+      h("p", {}, h("span", { class: "label" }, "可以问："), f.risk.ask),
+      f.risk.basis_shown ? h("p", { class: "basis" }, `依据：${f.risk.basis_shown}`) : null))
+    : [h("p", { class: "empty" }, "对照风险清单，没找到命中的条款。这不代表合同没有问题，只是清单里那些常见的写法没出现。")]));
+  $("#risks-section").hidden = false;
+  setStep("risks", "done");
+  state.checks.risks = ev;
+  showChecks();
+}
+
+function showMissing(missing) {
+  const labels = Object.fromEntries(state.fields.map((f) => [f.name, f.label]));
+  $("#missing").replaceChildren(...missing.map((m) =>
+    h("li", {},
+      h("span", { class: "what" }, `${labels[m.field] || m.field}：合同里没写`),
+      h("span", { class: "sub" }, `可以问：${m.risk.ask}`))));
+  $("#missing-section").hidden = !missing.length;
+}
+
+// 程序核对时去掉、改正的：默认收起，想知道"为什么没报"时看
+function showChecks() {
+  const items = [];
+  for (const part of [state.checks.info, state.checks.risks]) {
+    if (!part) continue;
+    for (const d of part.dropped) items.push(`去掉 ${d.field}：${d.reason}`);
+    for (const f of part.fixed) items.push(`改正 ${f}`);
+  }
+  $("#checks-title").textContent = `程序核对时去掉、改正的（${items.length} 条）`;
+  $("#checks-list").replaceChildren(...items.map((t) => h("li", {}, t)));
+  $("#checks").hidden = !items.length;
+}
+
+// ---------- 追问 ----------
+
+const CITATION = /〔\s*([A-Za-z]+\d*)\s*[：:]\s*([^〕]+?)\s*〕/g;
+
+// 回答里的〔c39：原文〕换成引文加出处；核对结果回来后，按出现的顺序对上
+function renderAnswer(el, text, checked) {
+  const parts = [];
+  let last = 0;
+  let n = 0;
+  for (const m of text.matchAll(CITATION)) {
+    parts.push(text.slice(last, m.index));
+    const item = checked ? checked[n] : null;
+    const status = item ? item.status : "pending";
+    const id = item ? item.clause : m[1];
+    const label = status === "unverified" ? "未能核对：合同里找不到这段原文" : where(id);
+    parts.push(h("span", { class: `cite ${status}` }, h("q", {}, m[2]), sourceButton(id, label)));
+    last = m.index + m[0].length;
+    n += 1;
+  }
+  parts.push(text.slice(last));
+  el.replaceChildren(...parts);
+}
+
+async function* sseEvents(res) {
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) return;
+    buffer += decoder.decode(value, { stream: true });
+    let end;
+    while ((end = buffer.indexOf("\n\n")) >= 0) {
+      const block = buffer.slice(0, end);
+      buffer = buffer.slice(end + 2);
+      const data = block.split("\n").filter((l) => l.startsWith("data: ")).map((l) => l.slice(6)).join("\n");
+      if (data) yield JSON.parse(data);
+    }
+  }
+}
+
+$("#ask-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const question = $("#question").value.trim();
+  if (!question || state.asking || !state.job) return;
+  state.asking = true;
+  document.body.dataset.answer = "streaming";
+  $("#ask-btn").disabled = true;
+  const textEl = h("p", { class: "answer", dataset: { anchor: "" } });
+  const noteEl = h("p", { class: "answer-note" });
+  $("#answer").replaceChildren(h("p", { class: "question" }, question), textEl, noteEl);
+  let text = "";
+  let checked = null;
+  try {
+    const res = await fetch(`/jobs/${encodeURIComponent(state.job.id)}/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
+    if (!res.ok) throw new Error(errorText(await res.json().catch(() => ({})), res.status));
+    for await (const ev of sseEvents(res)) {
+      if (ev.type === "delta") text += ev.text;
+      else if (ev.type === "retry") {
+        text = "";
+        noteEl.textContent = ev.reason;
+      } else if (ev.type === "citations") checked = ev.items;
+      else if (ev.type === "done") {
+        const items = checked || [];
+        const unverified = items.filter((c) => c.status === "unverified").length;
+        const cites = !items.length ? "" : unverified ? `有 ${unverified} 处引文在合同里找不到，已经标出来。` : "引文都在合同里核对过。";
+        noteEl.textContent = `用了 ${(ev.total_ms / 1000).toFixed(1)} 秒。${cites}`;
+      } else if (ev.type === "error") throw new Error(ev.message);
+      renderAnswer(textEl, text, checked);
+    }
+  } catch (err) {
+    noteEl.textContent = err.message || String(err);
+    noteEl.classList.add("bad");
+  } finally {
+    state.asking = false;
+    $("#ask-btn").disabled = false;
+    document.body.dataset.answer = "done";
+  }
+});
+
+// ---------- 打开页面 ----------
+
+async function init() {
+  state.fields = await (await fetch("/fields")).json();
+  const id = new URLSearchParams(location.search).get("job");
+  if (!id) return;
+  const res = await fetch(`/jobs/${encodeURIComponent(id)}`);
+  if (res.ok) return openJob(await res.json());
+  history.replaceState(null, "", "/");
+  showUploadError("找不到这个任务：可能是在别的电脑上传的，重新上传一次就好。");
+}
+
+init();
+</script>
+</body>
+</html>
