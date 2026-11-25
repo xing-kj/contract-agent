@@ -1,0 +1,22 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# 密钥
+.env
+
+# 审核时留的备份
+*.bak-*
+
+# 本地向量模型和向量库
+data/
+
+# 页面验收截图（scripts/check_page.py 生成）
+evals/results/page/
